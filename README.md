@@ -16,9 +16,8 @@ No install, no server, no dependencies to set up — just open the HTML file in 
 
 ## How to use it
 
-1. Download `immunopeptidome_atlas.html` (or `DOME.html`, depending on which version you're using)
-2. Open it in any modern browser (Chrome, Firefox, Edge, Safari)
-3. That's it — everything runs client-side, all data is embedded in the file
+1. Open 'Disease-associated-Omnibus-of-MHC-I-Epitopes-DOME' in any modern browser (Chrome, Firefox, Edge, Safari)
+2. That's it — everything runs client-side, all data is embedded in the file
 
 ## Exploring the data
 
