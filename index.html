@@ -1246,19 +1246,28 @@ function updatePaginationControls(totalCount) {
   }
 }
 
-// ---------- Unified DOM Initialization & Wiring ----------
+// ---------- Safe Unified DOM Initialization & Wiring ----------
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Initialize data load / immunopeptidome rollup first
+  
+  // 1. Safely trigger the data rollup if it exists globally
   if (typeof loadImmunopeptidomeRollup === 'function') {
-    loadImmunopeptidomeRollup();
+    try {
+      loadImmunopeptidomeRollup();
+    } catch (err) {
+      console.error("Error running loadImmunopeptidomeRollup:", err);
+    }
+  } else {
+    console.warn("loadImmunopeptidomeRollup function is not defined yet.");
   }
 
-  // 2. Ensure filtered has default data and render immediately if PDATA exists
-  if (typeof PDATA !== 'undefined' && PDATA && PDATA.rows && PDATA.rows.length > 0 && typeof filtered !== 'undefined' && filtered.length === 0) {
-    filtered = PDATA.rows;
-  }
-  if (typeof renderTable === 'function') {
-    renderTable();
+  // 2. Safely render table data if variables exist
+  if (typeof PDATA !== 'undefined' && PDATA && PDATA.rows && PDATA.rows.length > 0) {
+    if (typeof filtered !== 'undefined' && filtered.length === 0) {
+      filtered = PDATA.rows;
+    }
+    if (typeof renderTable === 'function') {
+      renderTable();
+    }
   }
 
   // 3. Wire up the composition download button
@@ -1266,32 +1275,37 @@ document.addEventListener('DOMContentLoaded', () => {
   if (compositionDownloadBtn) {
     compositionDownloadBtn.addEventListener('click', function() {
       const summaryDataElem = document.getElementById('summary-data');
-      if (!summaryDataElem) return;
-      const rawData = summaryDataElem.textContent;
-      const summaryJson = JSON.parse(rawData);
-      const stats = summaryJson.source_stats;
+      if (!summaryDataElem) {
+        console.error("Missing #summary-data script tag in HTML.");
+        return;
+      }
+      try {
+        const rawData = summaryDataElem.textContent;
+        const summaryJson = JSON.parse(rawData);
+        const stats = summaryJson.source_stats;
 
-      // Convert source stats to CSV format
-      let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "Source,Unique Peptides,Total Rows,HLA Category,Evidence Types\n";
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Source,Unique Peptides,Total Rows,HLA Category,Evidence Types\n";
 
-      stats.forEach(row => {
-        const evidenceStr = row.evidence_types.join("; ");
-        csvContent += `"${row.source}",${row.unique_peptides},${row.total_rows},"${row.hla_category}","${evidenceStr}"\n`;
-      });
+        stats.forEach(row => {
+          const evidenceStr = (row.evidence_types || []).join("; ");
+          csvContent += `"${row.source}",${row.unique_peptides},${row.total_rows},"${row.hla_category}","${evidenceStr}"\n`;
+        });
 
-      // Trigger browser download
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "dome_dataset_composition.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "dome_dataset_composition.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (e) {
+        console.error("Failed to parse summary-data JSON:", e);
+      }
     });
   }
 
-  // 4. Wire up the filtered export download button
+  // 4. Wire up filtered export button
   const downloadBtn = document.getElementById('downloadFilteredBtn');
   if (downloadBtn) {
     downloadBtn.addEventListener('click', (e) => {
@@ -1302,17 +1316,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 5. Wire up the clear selection button
+  // 5. Wire up clear button
   const clearBtn = document.getElementById('clearCustomFilter');
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      if (typeof clearCustomFilter === 'function') {
-        clearCustomFilter();
-      }
+      if (typeof clearCustomFilter === 'function') clearCustomFilter();
     });
   }
 
-  // 6. Wire up pagination buttons (prevPage / nextPage)
+  // 6. Pagination wiring
   const prevBtn = document.getElementById('prevPage');
   const nextBtn = document.getElementById('nextPage');
 
@@ -1327,7 +1339,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
-      const totalPages = Math.ceil((typeof filtered !== 'undefined' ? filtered.length : 0) / (typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 50)) || 1;
+      const pageSize = typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 50;
+      const totalPages = Math.ceil((typeof filtered !== 'undefined' ? filtered.length : 0) / pageSize) || 1;
       if (typeof page !== 'undefined' && page < totalPages - 1) {
         page++;
         if (typeof renderTable === 'function') renderTable();
