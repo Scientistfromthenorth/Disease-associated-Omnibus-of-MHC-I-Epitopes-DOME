@@ -1113,10 +1113,7 @@ function applyFilters(){
 // ---------- Table Rendering & Pagination ----------
 function renderTable() {
   const tbody = document.getElementById('peptideTableBody');
-  if (!tbody) {
-    console.warn('Element with ID "peptideTableBody" not found in HTML.');
-    return;
-  }
+  if (!tbody) return;
 
   const start = page * PAGE_SIZE;
   const end = start + PAGE_SIZE;
