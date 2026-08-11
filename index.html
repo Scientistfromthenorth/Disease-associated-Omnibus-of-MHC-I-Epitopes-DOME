@@ -423,6 +423,7 @@ const PAGE_SIZE = 50;
 let customFilterFn = null;
 let customFilterLabel = '';
 let lengthChartInstance = null;
+let currentExportFilename = 'immunopeptidome_filtered_results';
 
 // ---------- Chart Color Helpers ----------
 const CHART_FONT = { family: "'IBM Plex Mono', monospace", size: 11 };
@@ -443,21 +444,17 @@ async function loadImmunopeptidomeRollup() {
     if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
     const csvText = await response.text();
 
-    // Parse CSV via SheetJS
     const workbook = XLSX.read(csvText, { type: 'string' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const rawData = XLSX.utils.sheet_to_json(worksheet);
 
-    // Rollup accumulators
     const lengthDist = {};
     const binderBreakdown = {};
     const alleleFreq = {};
     
-    // Initialize overlap matrix structure
     const srcList = Object.values(SRC_LEGEND);
     const matrix = srcList.map(() => srcList.map(() => 0));
 
-// Map rows & calculate stats
     PDATA.rows = rawData.map(r => {
       const pep = String(r.peptide || '').trim();
       const len = parseInt(r.length) || pep.length;
@@ -470,7 +467,6 @@ async function loadImmunopeptidomeRollup() {
       const ptm = String(r.any_ptm || '').trim();
       const gene = String(r.gene || '').trim();
 
-      // 1. Length distribution
       const sourcesSplit = src.split(';').filter(Boolean);
       sourcesSplit.forEach(s => {
         const fullName = SRC_LEGEND[s] || s;
@@ -478,10 +474,8 @@ async function loadImmunopeptidomeRollup() {
         lengthDist[fullName][len] = (lengthDist[fullName][len] || 0) + 1;
       });
 
-      // 2. Binder calls
       binderBreakdown[binder] = (binderBreakdown[binder] || 0) + 1;
 
-      // 3. Transgenic C1R cell HLA-ligand frequencies (EXCLUSIVELY Stevanovic dataset)
       if (sourcesSplit.includes('STEVANOVIC') && allele) {
         allele.split(';').forEach(a => {
           const clean = a.trim();
@@ -489,7 +483,6 @@ async function loadImmunopeptidomeRollup() {
         });
       }
 
-      // 4. Overlap matrix
       for (let i = 0; i < srcList.length; i++) {
         for (let j = 0; j < srcList.length; j++) {
           const codeI = FULL_TO_CODE[srcList[i]];
@@ -503,7 +496,6 @@ async function loadImmunopeptidomeRollup() {
       return [pep, len, ns, src, cat, allele, binder, rank, ptm, gene];
     });
     
-    // Populate global SUMMARY
     SUMMARY = {
       total_unique_peptides: PDATA.rows.length,
       total_rows: PDATA.rows.length,
@@ -511,14 +503,12 @@ async function loadImmunopeptidomeRollup() {
       length_distribution: lengthDist,
       binder_call_breakdown: binderBreakdown,
       overlap_matrix: { sources: srcList, matrix: matrix },
-      source_stats: [] // Populated if needed
+      source_stats: []
     };
 
-// At the end of your data loading block:
-filtered = PDATA.rows;
-if (typeof renderTable === 'function') renderTable();
+    filtered = PDATA.rows;
+    if (typeof renderTable === 'function') renderTable();
 
-    // Initialize UI after data is ready
     initDashboard();
 
   } catch (error) {
@@ -528,14 +518,12 @@ if (typeof renderTable === 'function') renderTable();
 
 // ---------- Dashboard Bootstrapper ----------
 function initDashboard() {
-  // Hero stats
   try {
     document.getElementById('statUnique').textContent = fmt(SUMMARY.total_unique_peptides);
     document.getElementById('statRows').textContent = fmt(SUMMARY.total_rows);
     document.getElementById('statAlleles').textContent = Object.keys(SUMMARY.hla_c_allele_freq).length;
   } catch (e) { console.warn('Hero stats error:', e); }
 
-  // Populate source filter dropdown
   try {
     const srcFilterEl = document.getElementById('srcFilter');
     srcFilterEl.innerHTML = '<option value="">All Sources</option>';
@@ -547,7 +535,6 @@ function initDashboard() {
     });
   } catch (e) { console.warn('Source filter error:', e); }
 
-  // Length select options
   const lengthSelectEl = document.getElementById('lengthSourceSelect');
   if (lengthSelectEl) {
     lengthSelectEl.innerHTML = '<option value="">All Sources</option>';
@@ -562,7 +549,6 @@ function initDashboard() {
     });
   }
 
-  // Render visualizations safely
   try { renderLengthChart(''); } catch(e) { console.warn(e); }
   try { renderLengthBySourceChart(); } catch(e) { console.warn(e); }
   try { renderBinderChart(); } catch(e) { console.warn(e); }
@@ -969,77 +955,6 @@ function renderBinderChart(){
   } catch(e){ console.warn('Chart render failed (binder breakdown):', e); }
 }
 
-// ---------- HLA-C Allele Frequency Chart ----------
-function renderAlleleChart(){
-  try {
-    const freq = SUMMARY.hla_c_allele_freq || {};
-    const entries = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,15);
-    const baseColor = '#f2b84b';
-    const activeColor = '#4fd1c5';
-    let activeIdx = -1;
-    
-    // Ensure canvas exists and destroy any previous instance to prevent duplicates
-    const canvasEl = document.getElementById('alleleChart');
-    if (!canvasEl) return;
-    
-    const chart = new Chart(canvasEl, {
-      type:'bar',
-      data:{ 
-        labels: entries.map(e=>e[0]), 
-        datasets:[{
-          data: entries.map(e=>e[1]),
-          backgroundColor: entries.map(()=>baseColor)
-        }] 
-      },
-      options:{
-        indexAxis:'y',
-        plugins:{
-          legend:{display:false},
-          tooltip:{
-            callbacks:{
-              title:(c)=>`Transgenic C1R cells: ${c[0].label}`,
-              label:(c)=>`${fmt(c.parsed.x)} ligands extracted · click to view peptides`
-            }
-          }
-        },
-        scales:{ 
-          x:{grid:{color:'#1a2440'}, title:{display:true, text:'Extracted Ligands Count'}}, 
-          y:{grid:{display:false}, title:{display:true, text:'HLA Allele Transfectant'}} 
-        },
-        onHover:(evt, elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
-        onClick:(evt, elements)=>{
-          if(!elements.length) return;
-          const idx = elements[0].index;
-          const targetAllele = entries[idx][0]; // Exact string match key
-          
-          // Set dynamic export filename for download
-          currentExportFilename = `stevanovic_allele_${targetAllele.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-          setCustomFilter(
-            r => {
-              const rowAlleleStr = String(r[CI.allele] || '');
-              return rowAlleleStr.split(';').map(a => a.trim()).includes(targetAllele);
-            },
-            `Transgenic C1R Ligands (Stevanovic): <b>${targetAllele}</b> — ${fmt(entries[idx][1])} peptide records`
-          );
-          
-          activeIdx = idx;
-          chart.data.datasets[0].backgroundColor = entries.map((_,i)=> i===activeIdx ? activeColor : baseColor);
-          chart.update();
-        }
-      }
-    });
-
-    window.__resetAlleleChartHighlight = ()=>{
-      activeIdx = -1;
-      chart.data.datasets[0].backgroundColor = entries.map(()=>baseColor);
-      chart.update();
-    };
-  } catch(e){ console.warn('Chart render failed (allele frequency):', e); }
-}
-// Global variable to keep track of what the current export name should be
-let currentExportFilename = 'immunopeptidome_filtered_results';
-
 // ---------- Overlap Matrix Table ----------
 function renderOverlapTable(){
   try {
@@ -1069,10 +984,8 @@ function renderOverlapTable(){
           ? `Source: <b>${rowFull}</b> — all ${fmt(SUMMARY.overlap_matrix.matrix[+td.dataset.ri][+td.dataset.ci])} peptides`
           : `Overlap: <b>${rowFull}</b> ∩ <b>${colFull}</b> — ${fmt(SUMMARY.overlap_matrix.matrix[+td.dataset.ri][+td.dataset.ci])} shared peptides`;
         
-        // Update export filename context dynamically
         currentExportFilename = isDiag ? `peptides_${rowCode}` : `overlap_${rowCode}_${colCode}`;
 
-        // Apply filter which updates the global `filtered` array
         setCustomFilter(r=>{
           const srcs = r[CI.src].split(';');
           return srcs.includes(rowCode) && srcs.includes(colCode);
@@ -1241,61 +1154,6 @@ function updatePaginationControls(totalCount) {
   }
 }
 
-// ---------- Excel Export Handler ----------
-function downloadPeptidesAsExcel(dataRows, filename = 'filtered_peptides') {
-  if (!dataRows || dataRows.length === 0) {
-    alert('No peptides available to download under the current filter.');
-    return;
-  }
-
-  if (typeof XLSX === 'undefined') {
-    alert('Excel export library (SheetJS) is not loaded.');
-    return;
-  }
-
-  const exportData = dataRows.map(r => ({
-    Peptide: r[CI.pep],
-    Length: r[CI.len],
-    NumSources: r[CI.ns],
-    Sources: r[CI.src],
-    Category: r[CI.cat],
-    Allele: r[CI.allele],
-    BinderCall: r[CI.binder],
-    BindingRank: r[CI.rank],
-    PTM: r[CI.ptm],
-    Gene: r[CI.gene]
-  }));
-
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Peptides');
-  
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
-}
-
-// ---------- Dashboard Bootstrapper ----------
-function initDashboard() {
-  try {
-    document.getElementById('statUnique').textContent = fmt(SUMMARY.total_unique_peptides);
-    document.getElementById('statRows').textContent = fmt(SUMMARY.total_rows);
-    document.getElementById('statAlleles').textContent = Object.keys(SUMMARY.hla_c_allele_freq).length;
-  } catch (e) { console.warn('Hero stats error:', e); }
-
-  try {
-    const srcFilterEl = document.getElementById('srcFilter');
-    srcFilterEl.innerHTML = '<option value="">All Sources</option>';
-    SRC_CODES.forEach(code => {
-      const opt = document.createElement('option');
-      opt.value = code;
-      opt.textContent = SRC_LEGEND[code];
-      srcFilterEl.appendChild(opt);
-    });
-  } catch (e) { console.warn('Source filter error:', e); }
-
-  renderOverlapTable();
-  renderAlleleChart();
-}
-
 // ---------- Unified DOM Initialization & Wiring ----------
 document.addEventListener('DOMContentLoaded', () => {
   const downloadBtn = document.getElementById('downloadFilteredBtn');
@@ -1335,9 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (typeof loadImmunopeptidomeRollup === 'function') {
-    loadImmunopeptidomeRollup();
-  }
+  loadImmunopeptidomeRollup();
 });
 </script>
 </body>
