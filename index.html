@@ -1112,7 +1112,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
 // ---------- Custom Filter Management ----------
 function setCustomFilter(fn, labelHtml){
   customFilterFn = fn;
@@ -1198,6 +1197,7 @@ function exportPeptidesToExcel(dataRows, filenameOverride) {
 
   triggerDownload(workbook, filenameOverride);
 }
+
 // ---------- Table Rendering & Pagination ----------
 function renderTable() {
   const tbody = document.getElementById('peptideTableBody');
@@ -1300,7 +1300,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-});
 
   // 4. Wire up filtered export button
   const downloadBtn = document.getElementById('downloadFilteredBtn');
