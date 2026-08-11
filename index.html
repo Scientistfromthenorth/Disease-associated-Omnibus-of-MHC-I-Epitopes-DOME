@@ -1070,8 +1070,9 @@ function renderOverlapTable(){
   } catch(e){ console.warn('Overlap matrix render failed:', e); }
 }
 
-// Bind the download button cleanly ONCE globally
+// ---------- DOM Initialization ----------
 document.addEventListener('DOMContentLoaded', () => {
+  // 1. Wire up the download button
   const downloadBtn = document.getElementById('downloadFilteredBtn');
   if (downloadBtn) {
     downloadBtn.addEventListener('click', (e) => {
@@ -1079,8 +1080,15 @@ document.addEventListener('DOMContentLoaded', () => {
       downloadPeptidesAsExcel(filtered, currentExportFilename);
     });
   }
-});
 
+  // 2. Wire up the clear selection button
+  const clearBtn = document.getElementById('clearCustomFilter');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      clearCustomFilter();
+    });
+  }
+});
 // ---------- Custom Filter Management ----------
 function setCustomFilter(fn, labelHtml){
   customFilterFn = fn;
