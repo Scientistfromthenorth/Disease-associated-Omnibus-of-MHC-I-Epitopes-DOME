@@ -1155,8 +1155,18 @@ function applyFilters(){
   page = 0;
   if(typeof renderTable === 'function') renderTable();
 }
-// ---------- Excel Export Handler ----------
-function downloadPeptidesAsExcel(dataRows, filename = 'filtered_peptides') {
+
+// ---------- Global Export Filename ----------
+let currentExportFilename = 'immunopeptidome_filtered_results';
+
+// ---------- Trigger File Download Function ----------
+function triggerDownload(workbook, filename) {
+  const finalFilename = filename || currentExportFilename;
+  XLSX.writeFile(workbook, `${finalFilename}.xlsx`);
+}
+
+// ---------- Safe Export & Download Function ----------
+function exportPeptidesToExcel(dataRows, filenameOverride) {
   if (!dataRows || dataRows.length === 0) {
     alert('No peptides available to download under the current filter.');
     return;
@@ -1168,8 +1178,6 @@ function downloadPeptidesAsExcel(dataRows, filename = 'filtered_peptides') {
     return;
   }
 
-// ---------- Safe Export & Download Function ----------
-function exportPeptidesToExcel(dataRows, filenameOverride) {
   // Map raw row arrays back to an object format using COLS headers
   const exportData = dataRows.map(r => ({
     Peptide: r[CI.pep],
@@ -1190,26 +1198,6 @@ function exportPeptidesToExcel(dataRows, filenameOverride) {
 
   triggerDownload(workbook, filenameOverride);
 }
-
-// Global variable to keep track of what the current export name should be (declared only once)
-let currentExportFilename = 'immunopeptidome_filtered_results';
-
-// Trigger file download function
-function triggerDownload(workbook, filename) {
-  const finalFilename = filename || currentExportFilename;
-  XLSX.writeFile(workbook, `${finalFilename}.xlsx`);
-}
-
-// ---------- Custom Filter Management ----------
-function setCustomFilter(fn, labelHtml){
-  customFilterFn = fn;
-  customFilterLabel = labelHtml;
-  renderCustomFilterBanner();
-  applyFilters();
-  const explorer = document.getElementById('explorer');
-  if(explorer) explorer.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
 // ---------- Table Rendering & Pagination ----------
 function renderTable() {
   const tbody = document.getElementById('peptideTableBody');
