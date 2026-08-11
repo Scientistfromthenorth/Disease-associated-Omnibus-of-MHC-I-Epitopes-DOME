@@ -1248,76 +1248,92 @@ function updatePaginationControls(totalCount) {
 
 // ---------- Unified DOM Initialization & Wiring ----------
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Ensure filtered has default data and render immediately
-  if (PDATA && PDATA.rows && PDATA.rows.length > 0 && filtered.length === 0) {
+  // 1. Initialize data load / immunopeptidome rollup first
+  if (typeof loadImmunopeptidomeRollup === 'function') {
+    loadImmunopeptidomeRollup();
+  }
+
+  // 2. Ensure filtered has default data and render immediately if PDATA exists
+  if (typeof PDATA !== 'undefined' && PDATA && PDATA.rows && PDATA.rows.length > 0 && typeof filtered !== 'undefined' && filtered.length === 0) {
     filtered = PDATA.rows;
   }
-  renderTable();
+  if (typeof renderTable === 'function') {
+    renderTable();
+  }
 
-  // 2. Wire up the download button
+  // 3. Wire up the composition download button
+  const compositionDownloadBtn = document.getElementById('download-composition-btn');
+  if (compositionDownloadBtn) {
+    compositionDownloadBtn.addEventListener('click', function() {
+      const summaryDataElem = document.getElementById('summary-data');
+      if (!summaryDataElem) return;
+      const rawData = summaryDataElem.textContent;
+      const summaryJson = JSON.parse(rawData);
+      const stats = summaryJson.source_stats;
+
+      // Convert source stats to CSV format
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Source,Unique Peptides,Total Rows,HLA Category,Evidence Types\n";
+
+      stats.forEach(row => {
+        const evidenceStr = row.evidence_types.join("; ");
+        csvContent += `"${row.source}",${row.unique_peptides},${row.total_rows},"${row.hla_category}","${evidenceStr}"\n`;
+      });
+
+      // Trigger browser download
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "dome_dataset_composition.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  }
+
+  // 4. Wire up the filtered export download button
   const downloadBtn = document.getElementById('downloadFilteredBtn');
   if (downloadBtn) {
     downloadBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      downloadPeptidesAsExcel(filtered, currentExportFilename);
+      if (typeof downloadPeptidesAsExcel === 'function' && typeof filtered !== 'undefined' && typeof currentExportFilename !== 'undefined') {
+        downloadPeptidesAsExcel(filtered, currentExportFilename);
+      }
     });
   }
 
-  // 3. Wire up the clear selection button
+  // 5. Wire up the clear selection button
   const clearBtn = document.getElementById('clearCustomFilter');
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      clearCustomFilter();
+      if (typeof clearCustomFilter === 'function') {
+        clearCustomFilter();
+      }
     });
   }
 
-  // 4. Wire up pagination buttons (prevPage / nextPage)
+  // 6. Wire up pagination buttons (prevPage / nextPage)
   const prevBtn = document.getElementById('prevPage');
   const nextBtn = document.getElementById('nextPage');
 
   if (prevBtn) {
     prevBtn.addEventListener('click', () => {
-      if (page > 0) {
+      if (typeof page !== 'undefined' && page > 0) {
         page--;
-        renderTable();
+        if (typeof renderTable === 'function') renderTable();
       }
     });
   }
 
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
-      const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
-      if (page < totalPages - 1) {
+      const totalPages = Math.ceil((typeof filtered !== 'undefined' ? filtered.length : 0) / (typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 50)) || 1;
+      if (typeof page !== 'undefined' && page < totalPages - 1) {
         page++;
-        renderTable();
+        if (typeof renderTable === 'function') renderTable();
       }
     });
   }
-});
-// ---------- Initialization Trigger ----------
-document.addEventListener('DOMContentLoaded', loadImmunopeptidomeRollup);
-document.getElementById('download-composition-btn').addEventListener('click', function() {
-    const rawData = document.getElementById('summary-data').textContent;
-    const summaryJson = JSON.parse(rawData);
-    const stats = summaryJson.source_stats;
-
-    // Convert source stats to CSV format
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Source,Unique Peptides,Total Rows,HLA Category,Evidence Types\n";
-
-    stats.forEach(row => {
-        const evidenceStr = row.evidence_types.join("; ");
-        csvContent += `"${row.source}",${row.unique_peptides},${row.total_rows},"${row.hla_category}","${evidenceStr}"\n`;
-    });
-
-    // Trigger browser download
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "dome_dataset_composition.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
 });
 </script>
 </body>
