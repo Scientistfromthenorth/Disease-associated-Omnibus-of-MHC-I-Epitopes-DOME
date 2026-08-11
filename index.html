@@ -975,12 +975,20 @@ function renderAlleleChart(){
     const baseColor = '#f2b84b';
     const activeColor = '#4fd1c5';
     let activeIdx = -1;
-    const chart = new Chart(document.getElementById('alleleChart'), {
+    
+    // Ensure canvas exists and destroy any previous instance to prevent duplicates
+    const canvasEl = document.getElementById('alleleChart');
+    if (!canvasEl) return;
+    
+    const chart = new Chart(canvasEl, {
       type:'bar',
-      data:{ labels: entries.map(e=>e[0].replace('HLA-','')), datasets:[{
-        data: entries.map(e=>e[1]),
-        backgroundColor: entries.map(()=>baseColor)
-      }] },
+      data:{ 
+        labels: entries.map(e=>e[0]), 
+        datasets:[{
+          data: entries.map(e=>e[1]),
+          backgroundColor: entries.map(()=>baseColor)
+        }] 
+      },
       options:{
         indexAxis:'y',
         plugins:{
@@ -1000,18 +1008,26 @@ function renderAlleleChart(){
         onClick:(evt, elements)=>{
           if(!elements.length) return;
           const idx = elements[0].index;
-          const alleleFull = entries[idx][0];
-          const alleleCode = alleleFull.replace('HLA-','').replace('*','');
+          const targetAllele = entries[idx][0]; // Exact string match key
+          
+          // Set dynamic export filename for download
+          currentExportFilename = `stevanovic_allele_${targetAllele.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
           setCustomFilter(
-            r => (r[CI.allele]||'').split(';').includes(alleleCode),
-            `Transgenic C1R Ligands: <b>${alleleFull}</b> — ${fmt(entries[idx][1])} peptide records`
+            r => {
+              const rowAlleleStr = String(r[CI.allele] || '');
+              return rowAlleleStr.split(';').map(a => a.trim()).includes(targetAllele);
+            },
+            `Transgenic C1R Ligands (Stevanovic): <b>${targetAllele}</b> — ${fmt(entries[idx][1])} peptide records`
           );
+          
           activeIdx = idx;
           chart.data.datasets[0].backgroundColor = entries.map((_,i)=> i===activeIdx ? activeColor : baseColor);
           chart.update();
         }
       }
     });
+
     window.__resetAlleleChartHighlight = ()=>{
       activeIdx = -1;
       chart.data.datasets[0].backgroundColor = entries.map(()=>baseColor);
