@@ -1207,6 +1207,7 @@ function setCustomFilter(fn, labelHtml){
   const explorer = document.getElementById('explorer');
   if(explorer) explorer.scrollIntoView({behavior:'smooth', block:'start'});
 }
+
 // ---------- Table Rendering & Pagination ----------
 function renderTable() {
   const tbody = document.getElementById('peptideTableBody');
@@ -1315,8 +1316,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (downloadBtn) {
     downloadBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (typeof downloadPeptidesAsExcel === 'function' && typeof filtered !== 'undefined' && typeof currentExportFilename !== 'undefined') {
-        downloadPeptidesAsExcel(filtered, currentExportFilename);
+      if (typeof exportPeptidesToExcel === 'function' && typeof filtered !== 'undefined' && typeof currentExportFilename !== 'undefined') {
+        exportPeptidesToExcel(filtered, currentExportFilename);
       }
     });
   }
