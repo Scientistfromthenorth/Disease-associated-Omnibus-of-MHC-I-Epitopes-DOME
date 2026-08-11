@@ -454,10 +454,10 @@ async function loadImmunopeptidomeRollup() {
   try {
     const response = await fetch('immunopeptidome_peptide_rollup.csv');
     if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-    const csvText = await response.text();
-
-    // Parse CSV via SheetJS
-    const workbook = XLSX.read(csvText, { type: 'string' });
+    
+    // Fetch as arraybuffer so SheetJS handles CSV/Excel files cleanly in the browser
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const rawData = XLSX.utils.sheet_to_json(worksheet);
 
@@ -470,7 +470,7 @@ async function loadImmunopeptidomeRollup() {
     const srcList = Object.values(SRC_LEGEND);
     const matrix = srcList.map(() => srcList.map(() => 0));
 
-// Map rows & calculate stats
+    // Map rows & calculate stats
     PDATA.rows = rawData.map(r => {
       const pep = String(r.peptide || '').trim();
       const len = parseInt(r.length) || pep.length;
@@ -494,7 +494,7 @@ async function loadImmunopeptidomeRollup() {
       // 2. Binder calls
       binderBreakdown[binder] = (binderBreakdown[binder] || 0) + 1;
 
-      // 3. Transgenic C1R cell HLA-ligand frequencies (EXCLUSIVELY Stevanovic dataset)
+      // 3. Transgenic C1R cell HLA-ligand frequencies
       if (sourcesSplit.includes('STEVANOVIC') && allele) {
         allele.split(';').forEach(a => {
           const clean = a.trim();
@@ -524,12 +524,11 @@ async function loadImmunopeptidomeRollup() {
       length_distribution: lengthDist,
       binder_call_breakdown: binderBreakdown,
       overlap_matrix: { sources: srcList, matrix: matrix },
-      source_stats: [] // Populated if needed
+      source_stats: []
     };
 
-// At the end of your data loading block:
-filtered = PDATA.rows;
-if (typeof renderTable === 'function') renderTable();
+    filtered = PDATA.rows;
+    if (typeof renderTable === 'function') renderTable();
 
     // Initialize UI after data is ready
     initDashboard();
@@ -538,6 +537,11 @@ if (typeof renderTable === 'function') renderTable();
     console.error('Error loading immunopeptidome_peptide_rollup.csv:', error);
   }
 }
+
+// Automatically trigger data load when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  loadImmunopeptidomeRollup();
+});
 
 // ---------- Dashboard Bootstrapper ----------
 function initDashboard() {
