@@ -1166,6 +1166,8 @@ function downloadPeptidesAsExcel(dataRows, filename = 'filtered_peptides') {
     return;
   }
 
+// ---------- Safe Export & Download Function ----------
+function exportPeptidesToExcel(dataRows, filenameOverride) {
   // Map raw row arrays back to an object format using COLS headers
   const exportData = dataRows.map(r => ({
     Peptide: r[CI.pep],
@@ -1183,14 +1185,18 @@ function downloadPeptidesAsExcel(dataRows, filename = 'filtered_peptides') {
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Peptides');
-  
-  // Trigger file download
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
-}
-// ---------- Cleaned & Merged Code Fragment ----------
 
-// Global variable to keep track of what the current export name should be
+  triggerDownload(workbook, filenameOverride);
+}
+
+// Global variable to keep track of what the current export name should be (declared only once)
 let currentExportFilename = 'immunopeptidome_filtered_results';
+
+// Trigger file download function
+function triggerDownload(workbook, filename) {
+  const finalFilename = filename || currentExportFilename;
+  XLSX.writeFile(workbook, `${finalFilename}.xlsx`);
+}
 
 // ---------- Custom Filter Management ----------
 function setCustomFilter(fn, labelHtml){
@@ -1201,7 +1207,6 @@ function setCustomFilter(fn, labelHtml){
   const explorer = document.getElementById('explorer');
   if(explorer) explorer.scrollIntoView({behavior:'smooth', block:'start'});
 }
-
 // ---------- Table Rendering & Pagination ----------
 function renderTable() {
   const tbody = document.getElementById('peptideTableBody');
